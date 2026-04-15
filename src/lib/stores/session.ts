@@ -1,15 +1,18 @@
 import { browser } from '$app/environment';
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 import type { SessionState, SystemPhase, ThemeMode } from '$lib/system/types';
 import { withDB } from '$lib/system/db';
 import { sha256, verifyHash } from '$lib/system/security';
 
 export const systemPhase = writable<SystemPhase>('boot');
 export const session = writable<SessionState>({ isAuthenticated: false, username: 'Guest' });
+export const powerMode = writable<'none' | 'shutdown' | 'restart'>('none');
 export const theme = writable<ThemeMode>('dark');
 export const wallpaper = writable('');
 export const lockscreenWallpaper = writable('');
 export const accentColor = writable('#5b9cff');
+
+let restartTimer: ReturnType<typeof setTimeout> | null = null;
 
 export async function loadSessionState(): Promise<void> {
 	if (!browser) return;
@@ -83,4 +86,37 @@ export async function updatePin(oldSecret: string, newPin: string): Promise<bool
 	cred.pinHash = await sha256(newPin);
 	await withDB((db) => db.put('credentials', cred, cred.id));
 	return true;
+}
+
+export function sleepSystem(): void {
+	systemPhase.set('lock');
+	session.update((current) => ({ ...current, isAuthenticated: false }));
+}
+
+export function shutdownSystem(): void {
+	if (restartTimer) clearTimeout(restartTimer);
+	powerMode.set('shutdown');
+	systemPhase.set('updating');
+	session.update((current) => ({ ...current, isAuthenticated: false }));
+}
+
+export function restartSystem(): void {
+	if (restartTimer) clearTimeout(restartTimer);
+	powerMode.set('restart');
+	systemPhase.set('updating');
+	session.update((current) => ({ ...current, isAuthenticated: false }));
+	restartTimer = setTimeout(() => {
+		powerMode.set('none');
+		systemPhase.set('boot');
+	}, 1700);
+}
+
+export function powerOnSystem(): void {
+	if (restartTimer) clearTimeout(restartTimer);
+	powerMode.set('none');
+	systemPhase.set('boot');
+	const current = get(session);
+	if (!current.username) {
+		session.set({ isAuthenticated: false, username: 'User' });
+	}
 }

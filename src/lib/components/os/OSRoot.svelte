@@ -5,6 +5,7 @@
 	import BootScreen from '$lib/components/os/BootScreen.svelte';
 	import DesktopShell from '$lib/components/os/DesktopShell.svelte';
 	import LockScreen from '$lib/components/os/LockScreen.svelte';
+	import PowerScreen from '$lib/components/os/PowerScreen.svelte';
 	import { loadDesktopIcons } from '$lib/stores/desktop';
 	import { loadNotifications, pushNotification } from '$lib/stores/notifications';
 	import { loadSessionState, systemPhase, theme } from '$lib/stores/session';
@@ -54,6 +55,8 @@
 	<BootScreen />
 {:else if $systemPhase === 'lock'}
 	<LockScreen />
+{:else if $systemPhase === 'updating'}
+	<PowerScreen />
 {:else}
 	<DesktopShell />
 {/if}

@@ -2,8 +2,10 @@
 
 <script lang="ts">
 	import { fly } from 'svelte/transition';
+	import { MoonStar, Power, RotateCcw } from 'lucide-svelte';
 	import { APP_LIST } from '$lib/apps/registry';
 	import AppIcon from '$lib/components/common/AppIcon.svelte';
+	import { restartSystem, session, shutdownSystem, sleepSystem } from '$lib/stores/session';
 	import { buildAppPayloadForNode, getAssociatedAppForFile } from '$lib/system/fileAssociations';
 	import { recentFiles, trackRecentFile } from '$lib/stores/activity';
 	import { appLaunchCounts, launchApp, pinnedApps, startMenuOpen } from '$lib/stores/windows';
@@ -13,6 +15,7 @@
 
 	let query = '';
 	let showAllApps = false;
+	let powerMenuOpen = false;
 	$: results = query ? searchAppsAndFiles(query, APP_LIST, $vfsNodes) : [];
 	$: allApps = [...APP_LIST].sort((a, b) => a.name.localeCompare(b.name));
 	$: pinnedList = $pinnedApps
@@ -24,6 +27,7 @@
 	const runApp = (appId: Parameters<typeof launchApp>[0]) => {
 		launchApp(appId);
 		query = '';
+		powerMenuOpen = false;
 	};
 
 	const runRecommended = (kind: 'file' | 'settings' | 'notepad') => {
@@ -47,6 +51,14 @@
 		const app = getAssociatedAppForFile(node);
 		trackRecentFile(node.id, node.name, app);
 		launchApp(app, buildAppPayloadForNode(node));
+	};
+
+	const applyPowerAction = (action: 'sleep' | 'restart' | 'shutdown') => {
+		startMenuOpen.set(false);
+		powerMenuOpen = false;
+		if (action === 'sleep') sleepSystem();
+		else if (action === 'restart') restartSystem();
+		else shutdownSystem();
 	};
 </script>
 
@@ -141,6 +153,37 @@
 					{/each}
 				</div>
 			{/if}
+			<div class="mt-4 flex items-center justify-between rounded-xl border border-white/15 bg-white/5 p-2">
+				<div class="min-w-0">
+					<div class="truncate text-sm font-medium text-[var(--text)]">{$session.username || 'User'}</div>
+					<div class="text-[10px] text-[var(--muted)]">Local account</div>
+				</div>
+				<div class="relative">
+					<button
+						class="rounded-lg bg-white/10 p-2 text-[var(--text)] hover:bg-white/20"
+						title="Power"
+						on:click={() => (powerMenuOpen = !powerMenuOpen)}
+					>
+						<Power size={16} />
+					</button>
+					{#if powerMenuOpen}
+						<div class="absolute bottom-11 right-0 z-20 grid min-w-[170px] gap-1 rounded-xl border border-white/20 bg-[rgba(17,22,34,0.94)] p-2 shadow-2xl backdrop-blur-xl">
+							<button class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-white/15" on:click={() => applyPowerAction('sleep')}>
+								<MoonStar size={14} />
+								<span>Sleep</span>
+							</button>
+							<button class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-white/15" on:click={() => applyPowerAction('restart')}>
+								<RotateCcw size={14} />
+								<span>Restart</span>
+							</button>
+							<button class="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-red-500/25" on:click={() => applyPowerAction('shutdown')}>
+								<Power size={14} />
+								<span>Shut down</span>
+							</button>
+						</div>
+					{/if}
+				</div>
+			</div>
 		{:else}
 			<div class="mt-2">
 				{#if !results.length}
